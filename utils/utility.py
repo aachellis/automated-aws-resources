@@ -2,6 +2,7 @@ import boto3
 import logging
 import shutil
 import os
+import json
 
 def create_aws_resources(resource_stack, conf, s3, lambda_, glue):
     print(resource_stack)
@@ -28,7 +29,10 @@ def create_aws_resources(resource_stack, conf, s3, lambda_, glue):
                 Timeout = int(resource_conf.get('timeout', 3))
             )
 
-            resource_stack[resource['name']] = lambda_function
+            resource_stack[resource["name"]] = {
+                'type': 'lambda_function',
+                'resp': lambda_function
+            }
 
             os.remove("lambda_zip.zip")
 
@@ -60,4 +64,52 @@ def create_aws_resources(resource_stack, conf, s3, lambda_, glue):
 
             )
 
-            resource_stack[resource["name"]] = glue_job
+            os.remove("glue_helper.zip")
+
+            resource_stack[resource["name"]] = {
+                'type': 'glue_job',
+                'resp': glue_job
+            }
+
+def create_states(resource_stack, conf, sfn):
+    language_dict = {}
+    language_dict["States"] = {}
+    flag = 0
+    for index, states in enumerate(conf["jobs"]):
+        if flag == 0:
+            language_dict["StartAt"] = states["name"]
+            flag = 1
+
+        resourse_state = resource_stack[states["entity"]]
+
+        if resourse_state["type"] == "lambda_function":
+            temp_state = {
+                "Type": "Task",
+                "Resource": resource_stack["resp"]["FunctionArn"]
+            }
+
+        elif resourse_state["type"] == "glue_job":
+            temp_state = {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::glue:startJobRun.sync",
+                "Parameters": {
+                    "JobName": resourse_state["resp"]["Name"]
+                }
+            }
+
+        if index != len(conf["jobs"]) - 1:
+            temp_state["Next"] = states[index+1]["name"]
+        else:  
+            temp_state["End"] = True
+        
+        language_dict["States"][states["name"]] = temp_state
+
+    state_machine = sfn.create_state_machine(
+        name = conf["name"],
+        definition = json.dumps(language_dict),
+        roleArn = resource_stack['role_arn'],
+        type = 'STANDARD'
+    )
+
+    resource_stack["sfn"] = state_machine
+        

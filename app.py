@@ -5,7 +5,7 @@ import sys
 import uuid
 import botocore
 
-from utils.utility import create_aws_resources
+from utils.utility import create_aws_resources, create_states
 
 logging.basicConfig(
     level = logging.INFO,
@@ -32,6 +32,7 @@ iam = boto3.client("iam", region_name=region)
 s3 = boto3.client("s3", region_name=region)
 glue = boto3.client("glue", region_name=region)
 lambda_ = boto3.client("lambda", region_name=region)
+sfn = boto3.client("stepfunctions", region_name=region)
 
 if "name" not in conf:
     logging.error("Configuration file does not contains the required variable: name.")
@@ -47,7 +48,6 @@ bucket = s3.create_bucket(
     },
 )
 logging.info("Bucket with name : " + bucket_name + " has been created successfully.")
-input()
 
 with open("role_document.json") as f:
     policy = json.load(f)
@@ -63,7 +63,9 @@ logging.info("Role with name : " + conf["name"].replace(' ', '-') + "-execution-
 
 create_aws_resources(resource_stack, conf["resources"], s3, lambda_, glue)
 
-print(resource_stack)
+create_states(resource_stack, conf["states"], sfn)
+
+print(resource_stack, sfn)
 
 
 # except FileNotFoundError:
