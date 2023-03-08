@@ -1,0 +1,32 @@
+{
+    "name": "sample pipeline",
+    "description": "A demonstration of PoC which automatically creates / deploys aws resources and runs in specified manner.",
+    "region": "us-west-2",
+    "resources": [
+        {
+            "name": "my_glue_job",
+            "type": "glue_job",
+            "configuration": {
+                "glue_version": "3.0",
+                "worker_type": "Standard",
+                "num_workers": 2,
+                "working_directory": "my_glue_job"
+            }
+        }
+    ],
+    "groups": [
+        {
+            "name": "my_step",
+            "jobs": [
+                {
+                    "name": "my_lambda_function_job",
+                    "entity": "my_lambda_function"
+                },
+                {
+                    "name": "my_glue_job",
+                    "entity": "my_glue_job"
+                }
+            ] 
+        }
+    ]
+}
